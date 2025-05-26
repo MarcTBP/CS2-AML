@@ -22,6 +22,7 @@ __pycache__/
 *.env
 .env/
 sgnn_vtac_env/
+venv/
 
 # Ignore test logs and temp files
 *.log
