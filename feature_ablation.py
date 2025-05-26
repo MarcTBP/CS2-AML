@@ -2,14 +2,20 @@ import pandas as pd
 import numpy as np
 from sklearn.metrics import precision_score, recall_score, f1_score, average_precision_score
 from imblearn.over_sampling import SMOTE
-import torch
-import torch.nn as nn
+from xgboost import XGBClassifier
 import sys
 import itertools
+import joblib
 
 # File paths
-FEATURES_FILE = "txs_features.csv"
-LABELS_FILE = "txs_classes.csv"
+FEATURES_FILE = "data/txs_features.csv"
+LABELS_FILE = "data/txs_classes.csv"
+
+# Load the pre-trained model from Our_VTAC.py
+model = joblib.load("xgboost_model_10fold.pkl")
+
+# Get the feature names from the model
+model_features = model.get_booster().feature_names
 
 # 17 meaningful features selected for ablation testing
 MEANINGFUL_TX_FEATURES = [
@@ -20,69 +26,40 @@ MEANINGFUL_TX_FEATURES = [
 ]
 
 
-class VTACModel(nn.Module):
-    def __init__(self, input_dim, hidden_dim=64):
-        super(VTACModel, self).__init__()
-        self.fc1 = nn.Linear(input_dim, hidden_dim)
-        self.fc2 = nn.Linear(hidden_dim, hidden_dim)
-        self.out = nn.Linear(hidden_dim, 1)
-
-    def forward(self, x):
-        x = torch.relu(self.fc1(x))
-        x = torch.relu(self.fc2(x))
-        return torch.sigmoid(self.out(x))
-
-
 def load_data():
     df_features = pd.read_csv(FEATURES_FILE)
     df_labels = pd.read_csv(LABELS_FILE).rename(columns={"class": "label"})
-    label_map = {"1": 0, "2": 1, "3": -1}
+    label_map = {"1": 1, "2": 0, "unknown": -1}  # Updated to match Our_VTAC.py mapping
     df_labels["label"] = df_labels["label"].astype(str).map(label_map)
 
     df = pd.merge(df_features, df_labels, on="txId", how="inner")
     df = df[df["label"] != -1].dropna()
 
+    # Ensure we have all the features the model expects
+    missing_features = set(model_features) - set(df.columns)
+    if missing_features:
+        print(f"Warning: Missing features: {missing_features}")
+        # Add missing features with zeros
+        for feature in missing_features:
+            df[feature] = 0
+
+    # Reorder columns to match model's expected feature order
+    df = df[['txId', 'label'] + list(model_features)]
+
     return df
 
 
 def evaluate_full_model(X, y):
-    class_counts = pd.Series(y).value_counts()
-    print("Class distribution before resampling:", dict(class_counts))
-
-    apply_smote = class_counts.min() > 5
-    if apply_smote:
-        sm = SMOTE(random_state=42)
-        X, y = sm.fit_resample(X, y)
-        print("Applied SMOTE.")
-    else:
-        print("Skipping SMOTE: Not enough minority class samples.")
-
-    X_tensor = torch.FloatTensor(X)
-    y_tensor = torch.FloatTensor(y)
-
-    model = VTACModel(input_dim=X_tensor.shape[1])
-    optimizer = torch.optim.Adam(model.parameters())
-    criterion = nn.BCELoss()
-
-    for epoch in range(100):
-        model.train()
-        optimizer.zero_grad()
-        outputs = model(X_tensor)
-        loss = criterion(outputs, y_tensor.unsqueeze(1))
-        loss.backward()
-        optimizer.step()
-
-    model.eval()
-    with torch.no_grad():
-        probs = model(X_tensor).numpy()
-        preds = (probs > 0.5).astype(float)
+    # Use the pre-trained model to make predictions
+    y_pred = model.predict(X)
+    y_proba = model.predict_proba(X)[:, 1]
 
     return {
-        "Precision": precision_score(y_tensor, preds),
-        "Recall": recall_score(y_tensor, preds),
-        "F1 Micro": f1_score(y_tensor, preds, average="micro"),
-        "F1 Macro": f1_score(y_tensor, preds, average="macro"),
-        "AUC-PR": average_precision_score(y_tensor, probs)
+        "Precision": precision_score(y, y_pred),
+        "Recall": recall_score(y, y_pred),
+        "F1 Micro": f1_score(y, y_pred, average="micro"),
+        "F1 Macro": f1_score(y, y_pred, average="macro"),
+        "AUC-PR": average_precision_score(y, y_proba)
     }
 
 
@@ -116,21 +93,38 @@ if __name__ == "__main__":
     results = []
 
     # Baseline
+    print("\nEvaluating baseline model with all features...")
     baseline = evaluate_full_model(X_full.values, y)
     baseline["Removed Feature"] = "None"
     results.append(baseline)
     print_metrics(baseline)
 
-    # Feature ablation loop (all combinations of ablate_n features)
+    # Feature ablation loop
+    print(f"\nPerforming ablation study by removing {ablate_n} feature(s) at a time...")
     for features_to_remove in itertools.combinations(MEANINGFUL_TX_FEATURES, ablate_n):
-        print(f"Evaluating without feature(s): {features_to_remove}")
-        X_subset = X_full.drop(columns=list(features_to_remove)).values
-        metrics = evaluate_full_model(X_subset, y)
+        print(f"\nEvaluating without feature(s): {features_to_remove}")
+        # Create a copy of X_full with zeros for removed features
+        X_subset = X_full.copy()
+        for feature in features_to_remove:
+            if feature in X_subset.columns:
+                X_subset[feature] = 0
+
+        metrics = evaluate_full_model(X_subset.values, y)
         metrics["Removed Feature"] = ', '.join(features_to_remove)
         results.append(metrics)
         print_metrics(metrics)
 
     # Save results
     df_results = pd.DataFrame(results)
-    df_results.to_csv(f"vtac_feature_ablation_{ablate_n}_removed_results.csv", index=False)
-    print(f"Ablation results saved to vtac_feature_ablation_{ablate_n}_removed_results.csv")
+    output_file = f"vtac_feature_ablation_{ablate_n}_removed_results.csv"
+    df_results.to_csv(output_file, index=False)
+    print(f"\nAblation results saved to {output_file}")
+
+    # Print summary of results
+    print("\nSummary of ablation study:")
+    print("=" * 50)
+    print(f"Number of features removed: {ablate_n}")
+    print(f"Total combinations tested: {len(results) - 1}")  # -1 for baseline
+    print("\nTop 5 worst performing feature combinations:")
+    worst_combinations = df_results.sort_values('F1 Macro').head(6)  # Include baseline
+    print(worst_combinations[['Removed Feature', 'F1 Macro', 'Precision', 'Recall']])
