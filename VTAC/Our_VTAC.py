@@ -77,6 +77,10 @@ all_tx_ids_test, all_tx_ids_pred = [], []
 # 10-Fold Cross Validation
 skf = StratifiedKFold(n_splits=10, shuffle=True, random_state=42)
 
+best_model = None
+best_f1 = 0
+
+
 for fold, (train_idx, test_idx) in enumerate(skf.split(X, y), 1):
     print(f"\nFold {fold}")
     X_train, y_train = X.iloc[train_idx], y.iloc[train_idx]
@@ -105,6 +109,11 @@ for fold, (train_idx, test_idx) in enumerate(skf.split(X, y), 1):
     metrics_list["F1 (Micro)"].append(f1_score(y_test, y_pred, average='micro'))
     metrics_list["F1 (Macro)"].append(f1_score(y_test, y_pred, average='macro'))
     metrics_list["AUC-PR"].append(average_precision_score(y_test, y_proba))
+
+    f1_macro = f1_score(y_test, y_pred, average='macro')
+    if f1_macro > best_f1:
+        best_f1 = f1_macro
+        best_model = model
 
 # Final evaluation
 print("\nOverall Classification Report:")
@@ -137,7 +146,9 @@ plt.tight_layout()
 plt.show()
 
 # Save model (last fold's)
-joblib.dump(model, "xgboost_model_10fold.pkl")
+save_path = os.path.join("VTAC", "xgboost_model_10fold.pkl")
+joblib.dump(best_model, save_path)
+print("Saved best VTAC model based on Macro F1.")
 
 # Save predicted illicit transactions and edges
 bad_tx_ids = pd.Series(all_tx_ids_pred).drop_duplicates()
@@ -164,8 +175,8 @@ bad_edges["address_txId2"] = bad_edges["txId2"].map(tx_to_address)
 bad_edges.to_csv("Predicted_IllicitEdges_txID.csv", index=False)
 
 print(f"Number of predicted illicit transactions: {len(bad_tx_ids)}")
-print("Saving to:", os.path.abspath("VTAC/Predicted_IllicitTx_Edges.csv"))
-print(f"bad_edges shape: {bad_edges.shape}")
+print("Saving to:", os.path.abspath("Predicted_IllicitTx_Edges.csv"))
+print(f"shape: {bad_edges.shape}")
 
 # Feature importance from last model
 plt.figure(figsize=(10, 6))
