@@ -15,9 +15,14 @@ __pycache__/
 *.py[cod]
 
 # VSCode settings (if using VSCode)
+.idea/
 .vscode/
 
 # Environment files
 *.env
 .env/
-.sgnn_vtac_env/
+sgnn_vtac_env/
+
+# Ignore test logs and temp files
+*.log
+*.tmp
