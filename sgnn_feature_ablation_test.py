@@ -19,6 +19,7 @@ MEANINGFUL_TX_FEATURES = [
     "out_BTC_min", "out_BTC_max", "out_BTC_mean", "out_BTC_median", "out_BTC_total"
 ]
 
+
 # Step 2: Load the trained model
 from SGNN.train.train_config import creat_SGNN_addr_att
 model = creat_SGNN_addr_att()
@@ -36,16 +37,19 @@ _, hetero_test_loader = get_hetero_train_test_loader(rs_NP_ratio)
 _, hyper_test_loader = get_hyper_train_test_loader()
 print("Loaded test data.")
 
+
 # Step 4: Mask by index of the last N columns
-def mask_transaction_feature_by_tail_index(loader, relative_index_from_end):
+def mask_address_feature_by_tail_index(loader, relative_index_from_end):
     masked_loader = []
     for data in loader:
         data_copy = deepcopy(data)
-        total_cols = data_copy['transaction'].x.shape[1]
-        col_to_zero = total_cols - 17 + relative_index_from_end
-        data_copy['transaction'].x[:, col_to_zero] = 0
+        x = data_copy['address'].x.clone()
+        col_to_zero = x.shape[1] - 17 + relative_index_from_end  # Masking one of the last 17
+        x[:, col_to_zero] = 0
+        data_copy['address'].x = x
         masked_loader.append(data_copy)
     return masked_loader
+
 
 # Step 5: Evaluation function
 def evaluate_model(model, hetero_loader, hyper_loader):
@@ -83,7 +87,7 @@ results.append({"Removed Feature": "None", **metrics})
 # Loop to drop each of the last 17 features one by one
 for i, feature_name in enumerate(MEANINGFUL_TX_FEATURES):
     print(f"Evaluating with feature removed: {feature_name}")
-    masked_loader = mask_transaction_feature_by_tail_index(hetero_test_loader, i)
+    masked_loader = mask_address_feature_by_tail_index(hetero_test_loader, i)
     metrics = evaluate_model(model, masked_loader, hyper_test_loader)
     results.append({"Removed Feature": feature_name, **metrics})
 
