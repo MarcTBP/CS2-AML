@@ -13,9 +13,9 @@ import numpy as np
 import joblib
 
 # Load data
-features = pd.read_csv("txs_features.csv")
-classes = pd.read_csv("txs_classes.csv").rename(columns={"class": "label"})
-edges = pd.read_csv("txs_edgelist.csv")
+features = pd.read_csv("data/txs_features.csv")
+classes = pd.read_csv("data/txs_classes.csv").rename(columns={"class": "label"})
+edges = pd.read_csv("data/txs_edgelist.csv")
 
 # Map labels
 label_map = {"1": 1, "2": 0, "unknown": -1}
@@ -153,8 +153,8 @@ bad_edges["illicit_node"] = (
 )
 
 # Address mapping
-input_address = pd.read_csv("AddrTx_edgelist.csv")
-output_address = pd.read_csv("TxAddr_edgelist.csv")
+input_address = pd.read_csv("data/AddrTx_edgelist.csv")
+output_address = pd.read_csv("data/TxAddr_edgelist.csv")
 address_to_tx = dict(zip(input_address["txId"], input_address["input_address"]))
 tx_to_address = dict(zip(output_address["txId"], output_address["output_address"]))
 
@@ -164,7 +164,7 @@ bad_edges["address_txId2"] = bad_edges["txId2"].map(tx_to_address)
 bad_edges.to_csv("Predicted_IllicitEdges_txID.csv", index=False)
 
 print(f"Number of predicted illicit transactions: {len(bad_tx_ids)}")
-print("Saving to:", os.path.abspath("Predicted_IllicitTx_Edges.csv"))
+print("Saving to:", os.path.abspath("VTAC/Predicted_IllicitTx_Edges.csv"))
 print(f"bad_edges shape: {bad_edges.shape}")
 
 # Feature importance from last model

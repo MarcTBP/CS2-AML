@@ -16,19 +16,19 @@ START_ROW = 0
 SAMPLE_ROWS = 20000
 
 addr_addr = pd.read_csv(
-    os.path.join(base_dir, 'AddrAddr_edgelist.csv'),
+    os.path.join(base_dir, 'data/AddrAddr_edgelist.csv'),
     skiprows=range(1, START_ROW),
     nrows=SAMPLE_ROWS
 )
 
 input_map = pd.read_csv(
-    os.path.join(base_dir, 'AddrTx_edgelist.csv'),
+    os.path.join(base_dir, 'data/AddrTx_edgelist.csv'),
     skiprows=range(1, START_ROW),
     nrows=SAMPLE_ROWS
 )
 
 output_map = pd.read_csv(
-    os.path.join(base_dir, 'TxAddr_edgelist.csv'),
+    os.path.join(base_dir, 'data/TxAddr_edgelist.csv'),
     skiprows=range(1, START_ROW),
     nrows=SAMPLE_ROWS
 )
