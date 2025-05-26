@@ -20,3 +20,4 @@ __pycache__/
 # Environment files
 *.env
 .env/
+.sgnn_vtac_env/
