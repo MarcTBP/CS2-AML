@@ -9,7 +9,7 @@ import torch
 from copy import deepcopy
 import pandas as pd
 import matplotlib.pyplot as plt
-from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, roc_auc_score
+from sklearn.metrics import (accuracy_score, precision_score, recall_score, f1_score, roc_auc_score, average_precision_score)
 
 # Step 1: Define the last 17 feature names (column C171–C187 from your CSV)
 MEANINGFUL_TX_FEATURES = [
@@ -65,11 +65,11 @@ def evaluate_model(model, hetero_loader, hyper_loader):
     y_pred = torch.cat(all_preds).numpy()
     y_prob = torch.cat(all_probs).numpy()
     return {
-        "Accuracy": accuracy_score(y_true, y_pred),
         "Precision": precision_score(y_true, y_pred, zero_division=0),
         "Recall": recall_score(y_true, y_pred, zero_division=0),
-        "F1 Score": f1_score(y_true, y_pred, zero_division=0),
-        "AUC": roc_auc_score(y_true, y_prob)
+        "F1 Micro": f1_score(y_true, y_pred, average="micro", zero_division=0),
+        "F1 Macro": f1_score(y_true, y_pred, average="macro", zero_division=0),
+        "AUC-PR": average_precision_score(y_true, y_prob)
     }
 
 # Step 6: Run ablation experiments
@@ -94,7 +94,7 @@ print("Results saved to tail_feature_ablation_results.csv")
 
 plt.figure(figsize=(12, 6))
 x_labels = df["Removed Feature"]
-for metric in ["Accuracy", "Precision", "Recall", "F1 Score", "AUC"]:
+for metric in ["Precision", "Recall", "F1 Micro", "F1 Macro", "AUC-PR"]:
     plt.plot(x_labels, df[metric], marker='o', label=metric)
 plt.xlabel("Removed Feature (last 17 of transaction.x)")
 plt.ylabel("Performance")
