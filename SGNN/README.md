@@ -1,3 +1,4 @@
+# This readme is from the SGNN repository: https://github.com/CloudLab-NEU/SGNN
 # Illicit Social Accounts? Anti-money Laundering for Transactional Blockchains
 
 This is the source code of our paper titled "Illicit Social Accounts? Anti-money Laundering for Transactional Blockchains".
